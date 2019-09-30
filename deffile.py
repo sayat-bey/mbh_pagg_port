@@ -1,7 +1,7 @@
 import yaml
 import re
 import time
-from devclass import CellSiteGateway
+from devclass import CiscoXR
 from openpyxl import load_workbook, Workbook
 from pprint import pformat
 from netmiko.ssh_exception import NetMikoTimeoutException
@@ -15,7 +15,7 @@ from getpass import getpass
 
 def get_argv(argv):
 
-    argv_dict = {"maxth": 10, "conf": False}
+    argv_dict = {"maxth": 10}
     mt_pattern = re.compile(r"mt([0-9]+)")
 
     for i in argv:
@@ -23,11 +23,9 @@ def get_argv(argv):
             match = re.search(mt_pattern, i)
             if match and int(match.group(1)) <= 100:
                 argv_dict["maxth"] = int(match.group(1))
-        elif i == "cfg":
-            argv_dict["conf"] = True
 
     print("")
-    print("max threads: {}  configuration mode: {}".format(argv_dict["maxth"], argv_dict["conf"]))
+    print("max threads: {}".format(argv_dict["maxth"]))
 
     return argv_dict
 
@@ -49,17 +47,17 @@ def get_devinfo(yaml_file):
     if isinstance(devices_info, dict):
         print("hostname : ip")
         for hostname, ip_address in devices_info.items():
-            device = CellSiteGateway(ip=ip_address, host=hostname)
+            device = CiscoXR(ip=ip_address, host=hostname)
             devices.append(device)
     elif isinstance(devices_info, list) and "-" in devices_info[0]:    # hostname list
         print("hostname list")
         for hostname in devices_info:
-            device = CellSiteGateway(ip=hostname, host=hostname)
+            device = CiscoXR(ip=hostname, host=hostname)
             devices.append(device)
     elif isinstance(devices_info, list) and "-" not in devices_info[0]:  # ip list
         print("ip list")
         for ip_address in devices_info:
-            device = CellSiteGateway(ip=ip_address, host="hostname")
+            device = CiscoXR(ip=ip_address, host="hostname")
             devices.append(device)
 
     file.close()
@@ -155,161 +153,54 @@ def write_logs(devices, current_date, current_time, folder, exp_devinfo, exp_exc
 #######################################################################################
 
 
-def arp_log_parse(device):
-
-    ip_mac_vlan_pattern = re.compile(r"Internet\s\s([0-9.]+)\s+[0-9]+\s{3}([0-9a-z.]+)\s\sARPA\s{3}Vlan([0-9]+)")
-
-    exclude_mac = []
-    exclude_ip_vlan = []    # 10.12.244.10 vlan 3010 -> 249103011
-    exclude_vlan = [str(i) for i in range(1080, 1090)]
-    exclude_vlan.extend([str(i) for i in range(4000, 4017)])
-    exclude_vlan.append("4020")
-
-    for line in device.show_arp_log.splitlines():
-        ip_mac_vlan_match = re.search(ip_mac_vlan_pattern, line)
-
-        if ip_mac_vlan_match:
-            if ip_mac_vlan_match.group(2) in exclude_mac:
-                continue
-            elif ip_mac_vlan_match.group(3) in exclude_vlan:
-                continue
-            else:
-                last_octet = ip_mac_vlan_match.group(1).split(".")[3]
-                vlan = ip_mac_vlan_match.group(3)
-                ip_vlan = "{}{}".format(last_octet, vlan)
-
-                if ip_vlan in exclude_ip_vlan:
-                    exclude_mac.append(ip_mac_vlan_match.group(2))
-                    continue
-
-                else:
-                    device.device_bs_info_list.append({"ip": ip_mac_vlan_match.group(1),
-                                                       "mac": ip_mac_vlan_match.group(2),
-                                                       "vlan": ip_mac_vlan_match.group(3)})
-
-                    exclude_mac.append(ip_mac_vlan_match.group(2))
-                    exclude_ip_vlan.append("{}{}".format(last_octet, str(int(vlan)+1)))
-
-    for line in device.show_arp_lora_log.splitlines():
-        ip_mac_vlan_match = re.search(ip_mac_vlan_pattern, line)
-        if ip_mac_vlan_match:
-            device.device_bs_info_list.append({"ip": ip_mac_vlan_match.group(1),
-                                               "mac": ip_mac_vlan_match.group(2),
-                                               "vlan": ip_mac_vlan_match.group(3)})
 
 
-def mac_log_parse(device):
-    port_pattern = re.compile(r"[0-9]{3,4}\s{4}.{14}\s{4}DYNAMIC\s{5}(.+)")
-    for i in device.device_bs_info_list:
-        while True:
-            try:
-                show_mac_log = device.show_mac(i["mac"], i["vlan"])
-                if len(show_mac_log) == 0:
-                    device.show_errors["show_mac"] += 1
-                    print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_mac"))
-                else:
-                    break
-            except Exception as err_msg:
-                print("{0:17}{1:25}{2:20} msg={3}".format(device.ip_address, device.hostname,
-                                                          "EXCEPT ERROR show_mac", err_msg))
-                device.show_errors["show_mac"] += 1
-        for line in show_mac_log.splitlines():
-            port_match = re.search(port_pattern, line)
-            if port_match:
-                i["port"] = port_match.group(1)
 
 
-def define_pagg(device):
-    pagg_pattern = re.compile(r"[0-9.]{14}\s([a-z]{4}-[0-9]{6}-pagg-[123])")
-    for i in device.show_isis_log.splitlines():
-        pagg_match = re.search(pagg_pattern, i)
-        if pagg_match:
-            device.pagg = pagg_match.group(1)
 
 
 def show_commands(device):
 
     while True:
         try:
-            device.show_arp()
-            if len(device.show_arp_log) == 0:
-                device.show_errors["show_arp"] += 1
-                print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_arp"))
+            device.show_platform()
+            if len(device.show_platform_log) == 0:
+                device.show_errors["show_platform"] += 1
+                print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_platform"))
             else:
                 break
         except Exception as err_msg:
             print("{0:17}{1:25}{2:20} msg={3}".format(device.ip_address, device.hostname,
-                                                      "EXCEPT ERROR show_arp", err_msg))
-            device.show_errors["show_arp"] += 1
+                                                      "EXCEPT ERROR show_platform", err_msg))
+            device.show_errors["show_platform"] += 1
 
     while True:
         try:
-            device.show_isis()
-            if len(device.show_isis_log) == 0:
-                device.show_errors["show_isis"] += 1
-                print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_isis"))
+            device.show_inf_summary()
+            if len(device.show_inf_summary_log) == 0:
+                device.show_errors["show_inf_summary"] += 1
+                print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_inf_summary"))
             else:
                 break
         except Exception as err_msg:
             print("{0:17}{1:25}{2:20} msg={3}".format(device.ip_address, device.hostname,
-                                                      "EXCEPT ERROR show_isis", err_msg))
-            device.show_errors["show_isis"] += 1
+                                                      "EXCEPT ERROR show_inf_summary", err_msg))
+            device.show_errors["show_inf_summary"] += 1
 
     while True:
         try:
-            device.show_arp_lora()
-            if len(device.show_arp_lora_log) == 0:
-                device.show_errors["show_arp_lora"] += 1
-                print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_arp_lora"))
+            device.show_inf_description()
+            if len(device.show_inf_description_log) == 0:
+                device.show_errors["show_inf_description"] += 1
+                print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR show_inf_description"))
             else:
                 break
         except Exception as err_msg:
             print("{0:17}{1:25}{2:20} msg={3}".format(device.ip_address, device.hostname,
-                                                      "EXCEPT ERROR show_arp_lora", err_msg))
-            device.show_errors["show_arp_lora"] += 1
+                                                      "EXCEPT ERROR show_inf_description", err_msg))
+            device.show_errors["show_inf_description"] += 1
 
 
-def load_excel(excel_file, yaml_file, yaml_file2, folder):
-
-    print("load_excel: excel is loading")
-    wb = load_workbook(excel_file)
-    print("load_excel: excel is loaded")
-    sheet_names = ['AK', 'AL', 'AT', 'AU', 'AS', 'KO', 'SH', 'KZ', 'KS', 'TA', 'KA', 'PE', 'UR', 'PA', 'UK', 'SE']
-    sheets = [wb[i] for i in sheet_names]
-    result = {}     # bs abis ip : bs
-
-    for sheet in sheets:
-        i = 3
-
-        while True:
-            bs_ip = sheet.cell(row=i, column=5).value
-            bs = sheet.cell(row=i, column=1).value
-
-            if bs_ip:
-                i += 1
-                if bs:
-                    result[bs_ip] = bs
-            else:
-                break
-
-    with open(yaml_file, "r") as file:
-
-        altel_bs = yaml.load(file)
-        result.update(altel_bs)
-        print("load_excel: altel bs is added")
-
-    with open(yaml_file2, "r") as file2:
-
-        lora_bs = yaml.load(file2)
-        result.update(lora_bs)
-        print("load_excel: lora bs is added")
-
-    with open(folder + "bs_ip.yaml", "w") as output_file:
-
-        yaml.dump(result, output_file, default_flow_style=False)
-        print("load_excel: bs_ip is exported")
-
-    return result
 
 
 def export_excel(devices, current_time, folder):
@@ -330,38 +221,6 @@ def export_excel(devices, current_time, folder):
     wb.save(filename)
 
 
-def define_bs(device, bs_dict):
-
-    for bs in device.device_bs_info_list:
-        bs_ip = bs["ip"]
-
-        if bs_dict.get(bs_ip):
-            bs["bs"] = bs_dict[bs_ip]
-        else:
-            bs["bs"] = bs_ip
-
-
-def port_bs(device):
-
-    port_bs_dict = {}   # {port: [bs list]}
-
-    for bs in device.device_bs_info_list:
-        bsport = bs["port"]
-        bsname = bs["bs"]
-
-        if port_bs_dict.get(bsport):
-            port_bs_dict[bsport].append(bsname)
-        else:
-            port_bs_dict[bsport] = [bsname]
-
-    for port, bs_list in port_bs_dict.items():
-        device.port_bs[port] = []
-
-        for bs in bs_list:
-            if "lora" in bs:
-                device.port_bs[port].insert(0, bs)
-            else:
-                device.port_bs[port].append(bs)
 
 
 def export_device_info(device, export_file):
@@ -415,65 +274,39 @@ def export_device_info(device, export_file):
     export_file.write("\n\n")
 
 
-def make_config(device):
 
-    description_pattern = re.compile(r".*up\s+up\s+(.*) BS: (.*)")
-    description_old_pattern = re.compile(r".*up\s+up\s+(.*)")
-
-    for port, bs_list in device.port_bs.items():
-        while True:
-            try:
-                description = device.show_description(port)
-                if len(description) == 0:
-                    device.show_errors["make_config"] += 1
-                    print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "ERROR make_config"))
-                else:
-                    device.show_description_log[port] = description
-                    break
-            except Exception as err_msg:
-                print("{0:17}{1:25}{2:20} msg={3}".format(device.ip_address, device.hostname,
-                                                          "EXCEPT make_config", err_msg))
-                device.show_errors["make_config"] += 1
-
-        for line in description.splitlines():
-            description_match = re.search(description_pattern, line)
-            description_old_match = re.search(description_old_pattern, line)
-
-            if description_match:
-                extra_text = description_match.group(1)     # (extra_text) BS: bs_text
-                bs_text = description_match.group(2)        # extra_text BS: (bs_text)
-
-                bs_set = set(bs_text.split())
-                if bs_set != set(device.port_bs[port]):
-                    if len(extra_text) != 0:
-                        device.commands.append("interface {}".format(port))
-                        device.commands.append("description {} BS: {}".format(extra_text, " ".join(bs_list)))
-                    else:
-                        device.commands.append("interface {}".format(port))
-                        device.commands.append("description BS: {}".format(" ".join(bs_list)))
-
-            elif description_old_match:
-                if "lora" in " ".join(bs_list) and len(bs_list) == 1:
-                    if description_old_match.group(1) != "".join(bs_list):
-                        device.commands.append("interface {}".format(port))
-                        device.commands.append("description {}".format(" ".join(bs_list)))
-                elif "lora" in " ".join(bs_list) and len(bs_list) > 1:
-                    device.commands.append("interface {}".format(port))
-                    device.commands.append("description BS: {}".format(" ".join(bs_list)))
-                else:
-                    device.commands.append("interface {}".format(port))
-                    device.commands.append("description BS: {}".format(" ".join(bs_list)))
+def parse_show_platform(device):
+    for line in device.show_platform_log.splitlines():
+        slot = line.split()
+        if len(slot) > 0:
+            if slot[0] == r"0/0/0":
+                device.platform["slot_zero"] = slot[1]
+            elif slot[0] == r"0/0/1":
+                device.platform["slot_one"] = slot[1]
 
 
-def configure(device, argv_dict):
+def parse_show_inf_summary(device):
+    for line in device.show_inf_summary_log.splitlines():
+        inf = line.split()
+        if len(inf) > 0:
+            if inf[0] == "IFT_GETHERNET":
+                device.gig["total"] = inf[1]        # Total
+                device.gig["up"] = inf[2]           # UP
+                device.gig["down"] = inf[3]         # Down
+                device.gig["admin down"] = inf[4]   # Admin Down
 
-    if argv_dict["conf"]:
-        if len(device.commands) != 0:
-            device.configure(device.commands)
-            device.commit()
-        else:
-            print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "cfg is not needed"))
+            elif inf[0] == "IFT_TENGETHERNET":
+                device.tengig["total"] = inf[1]        # Total
+                device.tengig["up"] = inf[2]           # UPten
+                device.tengig["down"] = inf[3]         # Down
+                device.tengig["admin down"] = inf[4]   # Admin Down
 
-    else:
-        if len(device.commands) != 0:
-            print("{0:17}{1:25}{2:20}".format(device.ip_address, device.hostname, "cfg is needed"))
+
+def parse_show_inf_description(device):
+    for line in device.show_inf_description_log.splitlines():
+        line_list = line.split()
+        if len(line_list) > 0:
+            if r"Gi0/" in inf[0] and r"." not in inf[0]:
+                device.gig["total_description"] += 1
+            elif r"Te0/" in inf[0] and r"." not in inf[0]:
+                device.tengig["total_description"] += 1

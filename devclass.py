@@ -6,7 +6,7 @@ from netmiko import ConnectHandler
 #######################################################################################
 
 
-class CellSiteGateway:
+class CiscoXR:
 
     def __init__(self, ip, host):
         self.hostname = host
@@ -16,27 +16,37 @@ class CellSiteGateway:
         self.connection_status = True       # failed connection status, False if connection fails
         self.connection_error_msg = ""      # connection error message
 
-        self.show_arp_log = ""
-        self.show_arp_lora_log = ""
-        self.show_isis_log = ""
+        self.show_platform_log = ""
+        self.show_inf_summary_log = ""
+        self.show_inf_description_log = ""
 
-        self.pagg = ""
-        self.device_bs_info_list = []       # list of {port: , vlan: , ip: , mac: }
-        self.port_bs = {}                   # {port1: [bs1, bs2]}
-        self.commands = []
-        self.show_description_log = {}      # {port: description}
-        self.configuration_log = []
-        self.lic = {"10g": False,
-                    "4g": False}
-        self.show_errors = {"show_arp": 0,
-                            "show_isis": 0,
-                            "show_mac": 0,
-                            "show_arp_lora": 0,
-                            "make_config": 0,
-                            "show_lic": 0}
+
+
+        self.platform = {"slot_zero": None,
+                         "slot_one": None,
+                         "slot_two": "built_in_4x10GE"}
+
+        self.tengig = {"total": None,
+                       "up": None,
+                       "down": None,
+                       "admin down": None,
+                       "total_description": 0,
+                       "down_description": 0}
+
+        self.gig = {"total": None,
+                    "up": None,
+                    "down": None,
+                    "admin down": None,
+                    "total_description": 0,
+                    "down_description": 0}
+
+
+        self.show_errors = {"show_platform": 0,
+                            "show_inf_summary": 0,
+                            "show_inf_description": 0}
 
     def connect(self, myusername, mypassword):
-        self.ssh_conn = ConnectHandler(device_type="cisco_ios",
+        self.ssh_conn = ConnectHandler(device_type="cisco_xr",
                                        ip=self.ip_address,
                                        username=myusername,
                                        password=mypassword)
@@ -44,42 +54,26 @@ class CellSiteGateway:
     def disconnect(self):
         self.ssh_conn.disconnect()
 
-    def show_arp(self):
-        self.show_arp_log = self.ssh_conn.send_command(r"show ip arp vrf MA | exclude -|Incomplete")
 
-    def show_arp_lora(self):
-        self.show_arp_lora_log = self.ssh_conn.send_command(r"show ip arp vrf SMART_METERING | exclude -|Incomplete")
 
-    def show_isis(self):
-        self.show_isis_log = self.ssh_conn.send_command(r"show isis hostname | include pagg")
+    def show_platform(self):
+        self.show_platform_log = self.ssh_conn.send_command(r"show platform")
 
-    def show_mac(self, mac, vlan):
-        return self.ssh_conn.send_command(r"show mac-address-table address {} vlan {} | include DYNAMIC".format(mac,
-                                                                                                                vlan))
+    def show_inf_summary(self):
+        self.show_inf_summary_log = self.ssh_conn.send_command(r"show interfaces summary")
 
-    def show_description(self, port):
-        return self.ssh_conn.send_command(r"show interfaces {} description".format(port))
+    def show_inf_description(self):
+        self.show_inf_description_log = self.ssh_conn.send_command(r"show interfaces description")
 
-    def configure(self, cmd_list):
-        self.configuration_log.append(self.ssh_conn.send_config_set(cmd_list))
 
-    def commit(self):
-        self.configuration_log.append(self.ssh_conn.send_command('write memory'))
 
-    def show_license(self):
-        return self.ssh_conn.send_command("show license")
 
     def reset(self):
         self.connection_status = True       # failed connection status, False if connection fails
         self.connection_error_msg = ""      # connection error message
 
-        self.show_arp_log = ""
-        self.show_arp_lora_log = ""
-        self.show_isis_log = ""
-        self.pagg = ""
-        self.device_bs_info_list = []       # list of {port: , vlan: , ip: , mac: }
-        self.port_bs = {}                   # {port1: [bs1, bs2]}
-        self.commands = []
-        self.show_description_log = {}      # {port: description}
-        self.configuration_log = []
+        self.show_platform_log = ""
+        self.show_inf_summary_log = ""
+
+
 
