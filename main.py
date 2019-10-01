@@ -9,7 +9,7 @@ starttime = datetime.now()
 current_date = starttime.strftime("%Y.%m.%d")
 current_time = starttime.strftime("%H.%M.%S")
 current_dir = os.getcwd()
-folder = "{}\\logs\\{}\\".format(current_dir, current_date)     # current dir / logs / date /\=
+folder = "{}\\logs\\{}\\".format(current_dir, current_date)     # current dir / logs / date /
 
 if not os.path.exists(folder):
     os.mkdir(folder)
@@ -24,18 +24,17 @@ q = queue.Queue()
 argv_dict = get_argv(argv)
 username, password = get_user_pw()
 devices = get_devinfo("devices.yaml")
-bs_dict = load_excel('D:/MBH-local/CSG BS/actual IP_LTE_for_MBHv5.xlsx', "altel_bs.yaml", "lora_bs.yaml", folder)
 
 total_devices = len(devices)
 
 print("-------------------------------------------------------------------------------------------------------")
-print("ip address       hostname                 comment")
+print("hostname         ip address                 comment")
 print("---------------  -----------------------  -------------------------------------------------------------")
 
 
 for i in range(argv_dict["maxth"]):
 
-    th = Thread(target=mconnect, args=(username, password, q, bs_dict, argv_dict))
+    th = Thread(target=mconnect, args=(username, password, q))
     th.setDaemon(True)
     th.start()
 
@@ -47,8 +46,7 @@ q.join()
 
 print("")
 
-failed_connection_count = write_logs(devices, current_date, current_time, folder,
-                                     export_device_info, export_excel, argv_dict)
+failed_connection_count = write_logs(devices, current_date, current_time, folder, export_device_info, export_excel)
 duration = datetime.now() - starttime
 
 
