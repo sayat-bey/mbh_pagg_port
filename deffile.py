@@ -70,6 +70,7 @@ def mconnect(username, password, q):
                 parse_show_platform(device)
                 parse_show_inf_summary(device)
                 parse_show_inf_description(device)
+                count_uplink(device)
                 device.disconnect()
                 q.task_done()
                 break
@@ -201,14 +202,14 @@ def export_excel(devices, current_time, folder):
     filename = "{}{}_pagg_ports.xlsx".format(folder, current_time)
     wb = Workbook()
     sheet = wb.active
-    sheet.append(["pagg", "slot 0/0/0", "slot 0/0/1", "slot 0/0/2", "10G Free", "1G Free",
+    sheet.append(["pagg", "slot 0/0/0", "slot 0/0/1", "slot 0/0/2", "10G Free", "1G Free", "UPLINK",
                   "10G total", "up", "down", "a-down", "1G total", "up", "down", "a-down",
                   "10G total dscr", "1G total dscr"])
     for device in devices:
         if device.connection_status:
             sheet.append([device.hostname, device.platform["slot_zero"], device.platform["slot_one"],
                           device.platform["slot_two"],
-                          device.tengig["down_description"], device.gig["down_description"],
+                          device.tengig["down_description"], device.gig["down_description"], device.uplink,
                           device.tengig["total"], device.tengig["up"], device.tengig["down"],
                           device.tengig["admin down"],
                           device.gig["total"], device.gig["up"], device.gig["down"], device.gig["admin down"],
@@ -260,3 +261,12 @@ def parse_show_inf_description(device):
                 device.tengig["total_description"] += 1
                 if len(line_list) == 3 and "down" in line_list[1]:
                     device.tengig["down_description"] += 1
+
+
+def count_uplink(device):
+    for line in device.show_inf_description_log.splitlines():
+        line_list = line.split()
+        if len(line_list) > 0:
+            if r"Te0/" in line_list[0] and r"." not in line_list[0]:
+                if "UPLINK" in line_list[3]:
+                    device.uplink += 1
