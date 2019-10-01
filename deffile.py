@@ -36,7 +36,7 @@ def get_user_pw():
 def get_devinfo(yaml_file):
     devices = []
     file = open(yaml_file, "r")
-    devices_info = yaml.load(file)
+    devices_info = yaml.safe_load(file)
     if isinstance(devices_info, dict):
         print("hostname : ip")
         for hostname, ip_address in devices_info.items():
@@ -266,7 +266,7 @@ def parse_show_inf_description(device):
 def count_uplink(device):
     for line in device.show_inf_description_log.splitlines():
         line_list = line.split()
-        if len(line_list) > 0:
+        if len(line_list) >= 4:
             if r"Te0/" in line_list[0] and r"." not in line_list[0]:
                 if "UPLINK" in line_list[3]:
                     device.uplink += 1
