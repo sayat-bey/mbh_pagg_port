@@ -64,7 +64,7 @@ def mconnect(username, password, q):
         i = 0
         while True:
             try:
-                # print("{1:17}{2:25}{0:22}queue len: {3}".format("", device.hostname, device.ip_address))
+                print("{1:20}{2:25}{0:22}".format("", device.hostname, device.ip_address))
                 device.connect(username, password)
                 show_commands(device)
                 parse_show_platform(device)
@@ -77,22 +77,22 @@ def mconnect(username, password, q):
             except NetMikoTimeoutException as err_msg:
                 device.connection_status = False
                 device.connection_error_msg = str(err_msg)
-                print("{0:17}{1:25}{2:20}".format(device.hostname, device.ip_address, "timeout"))
+                print("{0:20}{1:25}{2:20}".format(device.hostname, device.ip_address, "timeout"))
                 q.task_done()
                 break
 
-            except Exception as err_msg:
+            except (Exception, ConnectionResetError) as err_msg:
                 if i == 3:
                     device.connection_status = False
                     device.connection_error_msg = str(err_msg)
-                    print("{0:17}{1:25}{2:20} i={3}".format(device.hostname, device.ip_address,
+                    print("{0:20}{1:25}{2:20} i={3}".format(device.hostname, device.ip_address,
                                                             "BREAK connection failed", i))
                     q.task_done()
                     break
                 else:
                     i += 1
                     device.reset()
-                    print("{0:17}{1:25}{2:20} i={3} msg={4}".format(device.hostname, device.ip_address,
+                    print("{0:20}{1:25}{2:20} i={3} msg={4}".format(device.hostname, device.ip_address,
                                                                     "ERROR connection failed", i, err_msg))
                     time.sleep(5)
 
@@ -135,10 +135,10 @@ def write_logs(devices, current_date, current_time, folder, exp_devinfo, exp_exc
     device_info_filename_file = open(device_info_filename, "w")
 
     for device in devices:
-        exp_devinfo(device, device_info_filename_file)          # export device info: show, status, etc
-        if not device.connection_status:
+        if device.connection_status:
+            exp_devinfo(device, device_info_filename_file)          # export device info: show, status, etc
+        else:
             failed_connection_count += 1
-
             conn_msg_filename_file.write("{} {}\n\n".format(current_date, current_time))
             conn_msg_filename_file.write("-"*80 + "\n")
             conn_msg_filename_file.write("{} : {}\n\n".format(device.hostname, device.ip_address))
@@ -161,11 +161,11 @@ def show_commands(device):
             device.show_platform()
             if len(device.show_platform_log) == 0:
                 device.show_errors["show_platform"] += 1
-                print("{0:17}{1:25}{2:20}".format(device.hostname, device.ip_address, "ERROR show_platform"))
+                print("{0:20}{1:25}{2:20}".format(device.hostname, device.ip_address, "ERROR show_platform"))
             else:
                 break
         except Exception as err_msg:
-            print("{0:17}{1:25}{2:20} msg={3}".format(device.hostname, device.ip_address,
+            print("{0:20}{1:25}{2:20} msg={3}".format(device.hostname, device.ip_address,
                                                       "EXCEPT ERROR show_platform", err_msg))
             device.show_errors["show_platform"] += 1
 
@@ -174,11 +174,11 @@ def show_commands(device):
             device.show_inf_summary()
             if len(device.show_inf_summary_log) == 0:
                 device.show_errors["show_inf_summary"] += 1
-                print("{0:17}{1:25}{2:20}".format(device.hostname, device.ip_address, "ERROR show_inf_summary"))
+                print("{0:20}{1:25}{2:20}".format(device.hostname, device.ip_address, "ERROR show_inf_summary"))
             else:
                 break
         except Exception as err_msg:
-            print("{0:17}{1:25}{2:20} msg={3}".format(device.hostname, device.ip_address,
+            print("{0:20}{1:25}{2:20} msg={3}".format(device.hostname, device.ip_address,
                                                       "EXCEPT ERROR show_inf_summary", err_msg))
             device.show_errors["show_inf_summary"] += 1
 
@@ -187,11 +187,11 @@ def show_commands(device):
             device.show_inf_description()
             if len(device.show_inf_description_log) == 0:
                 device.show_errors["show_inf_description"] += 1
-                print("{0:17}{1:25}{2:20}".format(device.hostname, device.ip_address, "ERROR show_inf_description"))
+                print("{0:20}{1:25}{2:20}".format(device.hostname, device.ip_address, "ERROR show_inf_description"))
             else:
                 break
         except Exception as err_msg:
-            print("{0:17}{1:25}{2:20} msg={3}".format(device.hostname, device.ip_address,
+            print("{0:20}{1:25}{2:20} msg={3}".format(device.hostname, device.ip_address,
                                                       "EXCEPT ERROR show_inf_description", err_msg))
             device.show_errors["show_inf_description"] += 1
 
@@ -235,16 +235,16 @@ def parse_show_inf_summary(device):
         line_list = line.split()
         if len(line_list) > 0:
             if line_list[0] == "IFT_GETHERNET":
-                device.gig["total"] = line_list[1]        # Total
-                device.gig["up"] = line_list[2]           # UP
-                device.gig["down"] = line_list[3]         # Down
-                device.gig["admin down"] = line_list[4]   # Admin Down
+                device.gig["total"] = int(line_list[1])        # Total
+                device.gig["up"] = int(line_list[2])           # UP
+                device.gig["down"] = int(line_list[3])         # Down
+                device.gig["admin down"] = int(line_list[4])   # Admin Down
 
             elif line_list[0] == "IFT_TENGETHERNET":
-                device.tengig["total"] = line_list[1]        # Total
-                device.tengig["up"] = line_list[2]           # UP
-                device.tengig["down"] = line_list[3]         # Down
-                device.tengig["admin down"] = line_list[4]   # Admin Down
+                device.tengig["total"] = int(line_list[1])          # Total
+                device.tengig["up"] = int(line_list[2])             # UP
+                device.tengig["down"] = int(line_list[3])           # Down
+                device.tengig["admin down"] = int(line_list[4])     # Admin Down
 
 
 def parse_show_inf_description(device):
