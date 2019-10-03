@@ -71,6 +71,7 @@ def mconnect(username, password, q):
                 parse_show_inf_summary(device)
                 parse_show_inf_description(device)
                 count_uplink(device)
+                count_inf_description(device)
                 device.disconnect()
                 q.task_done()
                 break
@@ -135,9 +136,32 @@ def write_logs(devices, current_date, current_time, folder, exp_devinfo, exp_exc
     device_info_filename = "{}{}_device_info.txt".format(folder, current_time)
     device_info_filename_file = open(device_info_filename, "w")
 
+    export_description_all = "{}{}_description_all.txt".format(folder, current_time)
+    export_description_exc_updown = "{}{}_description_exc_updown.txt".format(folder, current_time)
+    export_description_short = "{}{}_description_short.txt".format(folder, current_time)
+    export_description_all_file = open(export_description_all, "w")
+    export_description_exc_updown_file = open(export_description_exc_updown, "w")
+    export_description_short_file = open(export_description_short, "w")
+
     for device in devices:
         if device.connection_status:
             exp_devinfo(device, device_info_filename_file)          # export device info: show, status, etc
+
+            export_description_all_file.write("-" * 80 + "\n")
+            export_description_all_file.write("{} : {}\n\n".format(device.hostname, device.ip_address))
+            for i in device.description_all:
+                export_description_all_file.write(i + "\n")
+
+            export_description_exc_updown_file.write("-" * 80 + "\n")
+            export_description_exc_updown_file.write("{} : {}\n\n".format(device.hostname, device.ip_address))
+            for i in device.description_exc_updown:
+                export_description_exc_updown_file.write(i + "\n")
+
+            export_description_short_file.write("-" * 80 + "\n")
+            export_description_short_file.write("{} : {}\n\n".format(device.hostname, device.ip_address))
+            for i in device.description_short:
+                export_description_short_file.write(i + "\n")
+
         else:
             failed_connection_count += 1
             conn_msg_filename_file.write("{} {}\n\n".format(current_date, current_time))
@@ -147,6 +171,10 @@ def write_logs(devices, current_date, current_time, folder, exp_devinfo, exp_exc
 
     conn_msg_filename_file.close()
     device_info_filename_file.close()
+    export_description_all_file.close()
+    export_description_exc_updown_file.close()
+    export_description_short_file.close()
+
     return failed_connection_count
 
 
@@ -270,3 +298,15 @@ def count_uplink(device):
             if r"Te0/" in line_list[0] and r"." not in line_list[0]:
                 if "UPLINK" in line_list[3]:
                     device.uplink += 1
+
+
+def count_inf_description(device):
+    for line in device.show_inf_description_log.splitlines():
+        line_list = line.split()
+        if len(line_list) >= 4 and r"." not in line_list[0]:
+            if r"Te0/" in line_list[0] or r"Gi0/" in line_list[0]:
+                device.description_all.append(line_list[3])
+                if "UPLINK" not in line_list[3] and "DOWNLINK" not in line_list[3]:
+                    device.description_exc_updown.append(line_list[3])
+                if len(line_list[3]) < 25 and "UPLINK" != line_list[3]:
+                    device.description_short.append(line_list[3])

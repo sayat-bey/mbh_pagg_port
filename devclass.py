@@ -22,6 +22,10 @@ class CiscoXR:
         self.show_inf_description_log = None
         self.uplink = 0
 
+        self.description_all = []
+        self.description_exc_updown = []
+        self.description_short = []
+
         self.platform = {"slot_zero": "N/A",                 # A9K-MPA-20X1GE
                          "slot_one": "N/A",                  # A9K-MPA-2X10GE
                          "slot_two": "BUILT_IN_4x10GE"}
