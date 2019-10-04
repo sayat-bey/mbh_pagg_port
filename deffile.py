@@ -230,13 +230,17 @@ def export_excel(devices, current_time, folder):
     filename = "{}{}_pagg_ports.xlsx".format(folder, current_time)
     wb = Workbook()
     sheet = wb.active
-    sheet.append(["pagg", "slot 0/0/0", "slot 0/0/1", "slot 0/0/2", "10G Free", "1G Free", "UPLINK",
+    sheet.append(["PAGG ASR9001",
+                  "0/FT0/SP", "0/PM0/0/SP", "0/PM0/1/SP",
+                  "slot 0/0/0", "slot 0/0/1", "slot 0/0/2",
+                  "10G Free", "1G Free", "UPLINK",
                   "10G total", "up", "down", "a-down", "1G total", "up", "down", "a-down",
                   "10G total dscr", "1G total dscr"])
     for device in devices:
         if device.connection_status:
-            sheet.append([device.hostname, device.platform["slot_zero"], device.platform["slot_one"],
-                          device.platform["slot_two"],
+            sheet.append([device.hostname,
+                          device.platform["0/FT0/SP"], device.platform["0/PM0/0/SP"], device.platform["0/PM0/1/SP"],
+                          device.platform["slot_zero"], device.platform["slot_one"], device.platform["slot_two"],
                           device.tengig["down_description"], device.gig["down_description"], device.uplink,
                           device.tengig["total"], device.tengig["up"], device.tengig["down"],
                           device.tengig["admin down"],
@@ -257,6 +261,10 @@ def parse_show_platform(device):
                 device.platform["slot_zero"] = line_list[1]     # A9K-MPA-20X1GE
             elif line_list[0] == r"0/0/1":
                 device.platform["slot_one"] = line_list[1]
+            elif line_list[0] == r"0/FT0/SP":
+                device.platform[line_list[0]] = line_list[1]
+            elif line_list[0] == r"0/PM0/0/SP" or line_list[0] == r"0/PM0/1/SP":
+                device.platform[line_list[0]] = line_list[1]
 
 
 def parse_show_inf_summary(device):

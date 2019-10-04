@@ -28,7 +28,11 @@ class CiscoXR:
 
         self.platform = {"slot_zero": "N/A",                 # A9K-MPA-20X1GE
                          "slot_one": "N/A",                  # A9K-MPA-2X10GE
-                         "slot_two": "BUILT_IN_4x10GE"}
+                         "slot_two": "BUILT_IN_4x10GE",
+                         "0/FT0/SP": "N/A",
+                         "0/PM0/0/SP": "N/A",
+                         "0/PM0/1/SP": "N/A",
+                         }
 
         self.tengig = {"total": None,
                        "up": None,
@@ -58,7 +62,7 @@ class CiscoXR:
         self.ssh_conn.disconnect()
 
     def show_platform(self):
-        self.show_platform_log = self.ssh_conn.send_command(r"show platform")
+        self.show_platform_log = self.ssh_conn.send_command(r"admin show platform")
 
     def show_inf_summary(self):
         self.show_inf_summary_log = self.ssh_conn.send_command(r"show interfaces summary")
